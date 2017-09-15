@@ -12,12 +12,14 @@ body {
 </style>
 </head>
 <body>
+{{> common/_navigation }}
 
 {{#errorMessage}}
   <div>{{ errorMessage }}</div>
 {{/errorMessage}}
 
 <form method="post" action="/signup">
+
   <input type="text" name="username" required>
   <br>
   <input type="password" name="password" required>
