@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,35 +67,55 @@ public class InvoiceController {
 
 	
 	@PostMapping("/create")
-	public String createInvoice(Invoice invoice, long clientId, 
+	public ModelAndView createInvoice(Invoice invoice, long clientId, 
 			long[] recordIds, Authentication auth) {
-
-		User creator = (User) auth.getPrincipal();
-		List<BillingRecord> records = billingRepo.findByIdIn(recordIds); 
-		long nowish = Calendar.getInstance().getTimeInMillis();
-		Date now = new Date(nowish);
-		billingRepo.findAll();
 		
-		List<InvoiceLineItem> items = new ArrayList<InvoiceLineItem>();
-		
-		for(BillingRecord record: records) {
-			InvoiceLineItem lineItem = new InvoiceLineItem();
-			lineItem.setBillingRecord(record);
-			lineItem.setCreatedBy(creator);
-			lineItem.setCreatedOn(now);
-			lineItem.setInvoice(invoice);
-			items.add(lineItem);
+		ModelAndView mv;
+//
+		try {
+			User creator = (User) auth.getPrincipal();
+			List<BillingRecord> records = billingRepo.findByIdIn(recordIds); 
+			long nowish = Calendar.getInstance().getTimeInMillis();
+			Date now = new Date(nowish);
+			
+			//
+			billingRepo.findAll();
+			
+			List<InvoiceLineItem> items = new ArrayList<InvoiceLineItem>();
+			
+			for(BillingRecord record: records) {
+				InvoiceLineItem lineItem = new InvoiceLineItem();
+				lineItem.setBillingRecord(record);
+				lineItem.setCreatedBy(creator);
+				lineItem.setCreatedOn(now);
+				lineItem.setInvoice(invoice);
+				items.add(lineItem);
+			}
+			
+			invoice.setLineItems(items);
+			invoice.setCompany(companyRepo.findOne(clientId));
+			invoice.setCreatedBy(creator);
+			invoice.setCreatedOn(now);
+			
+			invoiceRepo.save(invoice);
+			
+			mv = new ModelAndView("redirect:/invoices");
+			
 		}
 		
-		invoice.setLineItems(items);
-		invoice.setCompany(companyRepo.findOne(clientId));
-		invoice.setCreatedBy(creator);
-		invoice.setCreatedOn(now);
+		catch(InvalidDataAccessApiUsageException e){
+//			System.out.println(e.getMessage());					
+			mv = new ModelAndView("/invoices/step-2");
+			mv.addObject("clientId", clientId);
+			mv.addObject("billingRecords", billingRepo.findByClientIdAndLineItemIsNull(clientId));
+			mv.addObject("errorMessage", "Please select at least one billing record");	
+			
+		}
 		
-		invoiceRepo.save(invoice);
+		return mv;
+		
 		
 	
-		return "redirect:/invoices";
 		
 	}
 	
